@@ -58,8 +58,14 @@ Adafruit_seesaw rot_encoder;
 Adafruit_VS1053_FilePlayer musicPlayer = 
   Adafruit_VS1053_FilePlayer(VS1053_RESET, VS1053_CS, VS1053_DCS, VS1053_DREQ, CARDCS);
 
-int green_value = 0;
+int32_t encoder_pos, encoder_dir;
+uint32_t cursor_pos = 0;
+bool cursor_indent = false;
+uint16_t color_vals [4] = {0, 0, 0, 0};
+char color_chars [4] = {'r', 'g', 'b', 'w'};
+
 uint32_t timer = millis();
+
 bool disp_button_state(uint32_t pin);
 
 
@@ -85,6 +91,7 @@ void setup() {
 
   rot_encoder.begin(ROT_ENCOD_ADDR);
   rot_encoder.pinMode(ROT_ENCOD_SWITCH, INPUT_PULLUP);
+  encoder_pos = rot_encoder.getEncoderPosition();
 
   temp_sensor.begin();
 
@@ -121,13 +128,50 @@ void loop() {
   }
   
   int32_t new_position = rot_encoder.getEncoderPosition();
+  encoder_dir = encoder_pos - new_position;
+  encoder_pos = new_position;
+  if(!rot_encoder.digitalRead(ROT_ENCOD_SWITCH)) {
+    cursor_indent = !cursor_indent;
+    encoder_dir = 0;
+  }
+
+  if(!cursor_indent) {
+    cursor_pos += encoder_dir;
+    cursor_pos = constrain(cursor_pos, 0, 3);
+  } else {
+    color_vals[cursor_pos] += 5 * encoder_dir;
+    color_vals[cursor_pos] = constrain(color_vals[cursor_pos], 0, 255);
+  }
 
   temp_sensor.getEvent(&humidity, &temp);
-  sev_seg.print(humidity.relative_humidity);
-  sev_seg.writeDisplay();
+  //sev_seg.print(humidity.relative_humidity);
+  //sev_seg.writeDisplay();
 
   oled_display.clearDisplay();
   oled_display.setCursor(0,0);
+  for(int i = 0; i < 4; i++) {
+    if(i == cursor_pos) {
+      if(!cursor_indent) {
+        oled_display.setTextColor(SH110X_BLACK, SH110X_WHITE);
+        oled_display.print(color_chars[i]); 
+        oled_display.print(": "); 
+        oled_display.println(color_vals[i]);
+        oled_display.setTextColor(SH110X_WHITE, SH110X_BLACK);
+      } else {
+        oled_display.print(color_chars[i]); 
+        oled_display.print(": "); 
+        oled_display.setTextColor(SH110X_BLACK, SH110X_WHITE);
+        oled_display.println(color_vals[i]);
+        oled_display.setTextColor(SH110X_WHITE, SH110X_BLACK);
+      }
+    } else {
+      oled_display.print(color_chars[i]); 
+      oled_display.print(": "); 
+      oled_display.println(color_vals[i]);
+    }
+  }
+  oled_display.display();
+  /*
   oled_display.print("Temperature: ");
   oled_display.println(temp.temperature);
   oled_display.print("Lat: "); oled_display.print(latitude); oled_display.println(lat);
@@ -136,7 +180,7 @@ void loop() {
   if(!disp_button_state(BUTTON_A)) oled_display.print("A");
   if(!disp_button_state(BUTTON_B)) oled_display.print("B");
   if(!disp_button_state(BUTTON_C)) oled_display.print("C");
-  if (! rot_encoder.digitalRead(ROT_ENCOD_SWITCH)) {
+  if  {
     if(musicPlayer.stopped()) {
       musicPlayer.startPlayingFile("/track001.mp3");
     }
@@ -146,16 +190,13 @@ void loop() {
       musicPlayer.pausePlaying(false);
     }
     }
-
-  uint32_t greenishwhite = neopixels.Color(0, green_value, 0, 0);
-  neopixels.fill(greenishwhite, 0, NEOPIXEL_COUNT);
+  */
+  uint32_t pixel_color = neopixels.Color(color_vals[0], color_vals[1], color_vals[2], color_vals[3]);
+  neopixels.fill(pixel_color, 0, NEOPIXEL_COUNT);
   neopixels.show();
 
   delay(100);
   yield();
-  oled_display.display();
-  green_value += 5;
-  green_value = green_value % 256;
 
 }
 
