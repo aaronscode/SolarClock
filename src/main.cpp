@@ -65,48 +65,38 @@ bool disp_button_state(uint32_t pin);
 
 void setup() {
 
-  sev_seg.begin(SEVSEG_ADDR);
-  temp_sensor.begin();
   oled_display.begin(OLED_ADDR, true); // Address 0x3C default
-  GPS.begin(GPS_ADDR);  // The I2C address to use is 0x10
+  oled_display.setTextSize(1);
+  oled_display.setTextColor(SH110X_WHITE);
+  oled_display.setCursor(0,0);
+  oled_display.setRotation(1);
+  oled_display.clearDisplay();
+  oled_display.display();
+
   neopixels.begin();
-  rot_encoder.begin(ROT_ENCOD_ADDR);
+  neopixels.show();
+
+  sev_seg.begin(SEVSEG_ADDR);
+
   musicPlayer.begin();
+  musicPlayer.setVolume(10,10);
+  musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
   SD.begin(CARDCS);
 
+  rot_encoder.begin(ROT_ENCOD_ADDR);
+  rot_encoder.pinMode(ROT_ENCOD_SWITCH, INPUT_PULLUP);
 
-  neopixels.show();
-  WiFi.setPins(WIFI_CS, WIFI_IRQ, WIFI_RST, WIFI_EN);
-  // uncomment this line to turn on RMC (recommended minimum) and GGA (fix data) including altitude
+  temp_sensor.begin();
+
+  GPS.begin(GPS_ADDR);  // The I2C address to use is 0x10
   GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
   GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
   GPS.sendCommand(PGCMD_ANTENNA);
 
-  uint32_t greenishwhite = neopixels.Color(64, 0, 0, 0);
-  neopixels.fill(greenishwhite, 0, NEOPIXEL_COUNT);
-  neopixels.show();
+  WiFi.setPins(WIFI_CS, WIFI_IRQ, WIFI_RST, WIFI_EN);
 
-  oled_display.display();
-  musicPlayer.setVolume(10,10);
-  musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
-  rot_encoder.pinMode(ROT_ENCOD_SWITCH, INPUT_PULLUP);
-  delay(1000);
-
-  // Clear the buffer.
-  oled_display.clearDisplay();
-  oled_display.display();
-
-  oled_display.setRotation(1);
-
-  //pinMode(BUTTON_A, INPUT_PULLUP);
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
-
-  oled_display.setTextSize(1);
-  oled_display.setTextColor(SH110X_WHITE);
-  oled_display.setCursor(0,0);
-  oled_display.display(); // actually display all of the above
-
 }
 
 void loop() {
