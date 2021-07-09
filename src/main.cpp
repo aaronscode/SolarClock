@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <SD.h>
 #include <WiFi101.h>
+#include <WiFiUdp.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_LEDBackpack.h> // yellow 7-segment display
@@ -12,6 +13,8 @@
 #include <Adafruit_AHTX0.h>  // humidity and temperature sensor
 #include <Adafruit_GPS.h>
 #include <Adafruit_seesaw.h> // rotary encoder I2C board
+
+#include "secrets.h"
 
 // buttons on OLED Screen featherwing
 #define BUTTON_A  13
@@ -58,15 +61,34 @@ Adafruit_seesaw rot_encoder;
 Adafruit_VS1053_FilePlayer musicPlayer = 
   Adafruit_VS1053_FilePlayer(VS1053_RESET, VS1053_CS, VS1053_DCS, VS1053_DREQ, CARDCS);
 
-int32_t encoder_pos, encoder_dir;
-uint32_t cursor_pos = 0;
+int32_t encoder_pos, encoder_dir, cursor_pos;
 bool cursor_indent = false;
-uint16_t color_vals [4] = {0, 0, 0, 0};
+int16_t color_vals [4] = {0, 0, 0, 0};
 char color_chars [4] = {'r', 'g', 'b', 'w'};
+
+int wifi_status = WL_IDLE_STATUS;
+unsigned int localPort = 2390;      // local port to listen for UDP packets
+IPAddress timeServer(129, 6, 15, 28); // time.nist.gov NTP server
+const int NTP_PACKET_SIZE = 48; // NTP time stamp is in the first 48 bytes of the message
+byte packetBuffer[ NTP_PACKET_SIZE]; //buffer to hold incoming and outgoing packets
+// A UDP instance to let us send and receive packets over UDP
+WiFiUDP Udp;
+
 
 uint32_t timer = millis();
 
 bool disp_button_state(uint32_t pin);
+
+// 'BackArrow', 5x7px
+const unsigned char epd_bitmap_BackArrow [] PROGMEM = {
+	0x18, 0x08, 0x28, 0x68, 0xf8, 0x60, 0x20
+};
+
+// Array of all bitmaps for convenience. (Total bytes used to store images in PROGMEM = 32)
+const int epd_bitmap_allArray_LEN = 1;
+const unsigned char* epd_bitmap_allArray[1] = {
+	epd_bitmap_BackArrow
+};
 
 
 void setup() {
@@ -80,6 +102,7 @@ void setup() {
   oled_display.display();
 
   neopixels.begin();
+  neopixels.clear();
   neopixels.show();
 
   sev_seg.begin(SEVSEG_ADDR);
@@ -101,6 +124,8 @@ void setup() {
   GPS.sendCommand(PGCMD_ANTENNA);
 
   WiFi.setPins(WIFI_CS, WIFI_IRQ, WIFI_RST, WIFI_EN);
+  wifi_status = WiFi.begin(WLAN_SSID, WLAN_PASS);
+  Udp.begin(localPort);
 
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
@@ -170,16 +195,26 @@ void loop() {
       oled_display.println(color_vals[i]);
     }
   }
+
+  if(!disp_button_state(BUTTON_A)) oled_display.print("A");
+  if(!disp_button_state(BUTTON_B)) oled_display.print("B");
+  if(!disp_button_state(BUTTON_C)) oled_display.print("C");
+
+  oled_display.println();
+  if(wifi_status == WL_CONNECTED) {
+    oled_display.println("Connected to:"); oled_display.println(WLAN_SSID);
+  } else {
+    oled_display.print("Not connected.\n Error code: "); oled_display.println(wifi_status);
+  }
+  oled_display.drawBitmap(50, 0, epd_bitmap_BackArrow, 5, 7, SH110X_WHITE);
   oled_display.display();
+  delay(300);
   /*
   oled_display.print("Temperature: ");
   oled_display.println(temp.temperature);
   oled_display.print("Lat: "); oled_display.print(latitude); oled_display.println(lat);
   oled_display.print("Lon: "); oled_display.print(longitude); oled_display.println(lon);
   oled_display.print("Encoder pos: "); oled_display.println(new_position);
-  if(!disp_button_state(BUTTON_A)) oled_display.print("A");
-  if(!disp_button_state(BUTTON_B)) oled_display.print("B");
-  if(!disp_button_state(BUTTON_C)) oled_display.print("C");
   if  {
     if(musicPlayer.stopped()) {
       musicPlayer.startPlayingFile("/track001.mp3");
@@ -188,25 +223,47 @@ void loop() {
       musicPlayer.pausePlaying(true);
     } else { 
       musicPlayer.pausePlaying(false);
-    }
-    }
+    }  if(pin == BUTTON_A) {
+    pinMode(BUTTON_A, OUTPUT);
+  }
   */
   uint32_t pixel_color = neopixels.Color(color_vals[0], color_vals[1], color_vals[2], color_vals[3]);
-  neopixels.fill(pixel_color, 0, NEOPIXEL_COUNT);
+  neopixels.fill(pixel_color);
   neopixels.show();
 
-  delay(100);
   yield();
 
 }
 
 bool disp_button_state(uint32_t pin) {
-  if(pin == BUTTON_A) {
-    pinMode(BUTTON_A, INPUT_PULLUP);
-  }
-  int state = digitalRead(pin);
-  if(pin == BUTTON_A) {
-    pinMode(BUTTON_A, OUTPUT);
-  }
-  return bool(state);
+  if(pin == NEOPIXEL_PIN) {
+    pinMode(NEOPIXEL_PIN, INPUT_PULLUP);
+    int state = digitalRead(pin);
+    pinMode(NEOPIXEL_PIN, OUTPUT);
+    return bool(state);
+  } else
+    return bool(digitalRead(pin));
+}
+
+// send an NTP request to the time server at the given address
+unsigned long sendNTPpacket(IPAddress& address)
+{
+  // set all bytes in the buffer to 0
+  memset(packetBuffer, 0, NTP_PACKET_SIZE);
+  // Initialize values needed to form NTP request
+  // (see URL above for details on the packets)
+  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
+  packetBuffer[1] = 0;     // Stratum, or type of clock
+  packetBuffer[2] = 6;     // Polling Interval
+  packetBuffer[3] = 0xEC;  // Peer Clock Precision
+  // 8 bytes of zero for Root Delay & Root Dispersion
+  packetBuffer[12]  = 49;
+  packetBuffer[13]  = 0x4E;
+  packetBuffer[14]  = 49;
+  packetBuffer[15]  = 52;
+  // all NTP fields have been given values, now
+  // you can send a packet requesting a timestamp:
+  Udp.beginPacket(address, 123); //NTP requests are to port 123
+  Udp.write(packetBuffer, NTP_PACKET_SIZE);
+  Udp.endPacket();
 }
