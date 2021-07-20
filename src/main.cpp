@@ -20,6 +20,13 @@
 #define BUTTON_A  13
 #define BUTTON_B  12
 #define BUTTON_C  11
+// "pin" for rotary encoder (seems arbitrary? 24 was the value used in the example code)
+#define ROT_ENCOD_SWITCH  24   // not an actual pin on feather, maybe a pin on the rotary encoder board?
+
+#define DISP_SWITCHA_IDX 0 
+#define DISP_SWITCHB_IDX 1 
+#define DISP_SWITCHC_IDX 2 
+#define ENCOD_SWITCH_IDX 3
 
 // Pin used to drive Neopixels, shared with BUTTON_A (so we have to switch the function of this pin)
 #define NEOPIXEL_PIN   13
@@ -38,8 +45,6 @@
 #define WIFI_RST  4
 #define WIFI_EN   2
 
-// "pin" for rotary encoder (seems arbitrary? 24 was the value used in the example code)
-#define ROT_ENCOD_SWITCH  24   // not an actual pin on feather, maybe a pin on the rotary encoder board?
 
 #define GPSECHO false // turn off echoing of gps sentences to serial console
 #define NEOPIXEL_COUNT 19 // number of Neopixels in strand
@@ -63,8 +68,12 @@ Adafruit_VS1053_FilePlayer musicPlayer =
 
 int32_t encoder_pos, encoder_dir, cursor_pos;
 bool cursor_indent = false;
+uint8_t buttons_state = 0;
 int16_t color_vals [4] = {0, 0, 0, 0};
 char color_chars [4] = {'r', 'g', 'b', 'w'};
+sensors_event_t humidity, temp;
+float latitude, longitude;
+char lat, lon;
 
 int wifi_status = WL_IDLE_STATUS;
 unsigned int localPort = 2390;      // local port to listen for UDP packets
@@ -74,10 +83,10 @@ byte packetBuffer[ NTP_PACKET_SIZE]; //buffer to hold incoming and outgoing pack
 // A UDP instance to let us send and receive packets over UDP
 WiFiUDP Udp;
 
-
 uint32_t timer = millis();
 
 bool disp_button_state(uint32_t pin);
+uint8_t get_buttons_debounce(uint8_t last_buttons_state);
 
 // 'BackArrow', 5x7px
 const unsigned char epd_bitmap_BackArrow [] PROGMEM = {
@@ -132,9 +141,8 @@ void setup() {
 }
 
 void loop() {
-  sensors_event_t humidity, temp;
-  float latitude, longitude;
-  char lat, lon;
+
+  buttons_state = get_buttons_debounce(buttons_state);
 
   char c = GPS.read();
   // if a sentence is received, we can check the checksum, parse it...
@@ -155,7 +163,7 @@ void loop() {
   int32_t new_position = rot_encoder.getEncoderPosition();
   encoder_dir = encoder_pos - new_position;
   encoder_pos = new_position;
-  if(!rot_encoder.digitalRead(ROT_ENCOD_SWITCH)) {
+  if(buttons_state & 1 << ENCOD_SWITCH_IDX) {
     cursor_indent = !cursor_indent;
     encoder_dir = 0;
   }
@@ -196,9 +204,9 @@ void loop() {
     }
   }
 
-  if(!disp_button_state(BUTTON_A)) oled_display.print("A");
-  if(!disp_button_state(BUTTON_B)) oled_display.print("B");
-  if(!disp_button_state(BUTTON_C)) oled_display.print("C");
+  if(buttons_state & 1 << DISP_SWITCHA_IDX) oled_display.print("A");
+  if(buttons_state & 1 << DISP_SWITCHB_IDX) oled_display.print("B");
+  if(buttons_state & 1 << DISP_SWITCHC_IDX) oled_display.print("C");
 
   oled_display.println();
   if(wifi_status == WL_CONNECTED) {
@@ -208,7 +216,6 @@ void loop() {
   }
   oled_display.drawBitmap(50, 0, epd_bitmap_BackArrow, 5, 7, SH110X_WHITE);
   oled_display.display();
-  delay(300);
   /*
   oled_display.print("Temperature: ");
   oled_display.println(temp.temperature);
@@ -243,6 +250,25 @@ bool disp_button_state(uint32_t pin) {
     return bool(state);
   } else
     return bool(digitalRead(pin));
+}
+
+uint8_t get_buttons_debounce(uint8_t last_buttons_state) {
+  uint8_t buttons_state = 0;
+  buttons_state |= !disp_button_state(BUTTON_A);
+  buttons_state |= !disp_button_state(BUTTON_B) << 1;
+  buttons_state |= !disp_button_state(BUTTON_C) << 2;
+  buttons_state |= !rot_encoder.digitalRead(ROT_ENCOD_SWITCH) << 3;
+  delay(50);
+  if(buttons_state != last_buttons_state && buttons_state > 0) {
+    last_buttons_state = buttons_state;
+    buttons_state = 0;
+    buttons_state |= !disp_button_state(BUTTON_A);
+    buttons_state |= !disp_button_state(BUTTON_B) << 1;
+    buttons_state |= !disp_button_state(BUTTON_C) << 2;
+    buttons_state |= !rot_encoder.digitalRead(ROT_ENCOD_SWITCH) << 3;
+    buttons_state &= last_buttons_state;
+  }
+  return buttons_state;
 }
 
 // send an NTP request to the time server at the given address
