@@ -15,6 +15,8 @@
 #include <Adafruit_seesaw.h> // rotary encoder I2C board
 
 #include "secrets.h"
+#include "menu.h"
+#include "menu_entry.h"
 
 // buttons on OLED Screen featherwing
 #define BUTTON_A  13
@@ -55,6 +57,7 @@
 #define ROT_ENCOD_ADDR  0x36 // I2C address for rotary encoder
 
 
+
 // Connect to the GPS on the hardware I2C port
 Adafruit_GPS GPS(&Wire);
 
@@ -66,10 +69,12 @@ Adafruit_seesaw rot_encoder;
 Adafruit_VS1053_FilePlayer musicPlayer = 
   Adafruit_VS1053_FilePlayer(VS1053_RESET, VS1053_CS, VS1053_DCS, VS1053_DREQ, CARDCS);
 
-int32_t encoder_pos, encoder_dir, cursor_pos;
-bool cursor_indent = false;
+Menu menu = Menu(true);
+
+bool GPS_status, temp_sensor_status, oled_status, sev_seg_status, neopixel_status, rot_encoder_status, music_player_status;
+int32_t encoder_pos, encoder_dir;
 uint8_t buttons_state = 0;
-int16_t color_vals [4] = {0, 0, 0, 0};
+int16_t color_vals [4] = {255, 243, 0, 0};
 char color_chars [4] = {'r', 'g', 'b', 'w'};
 sensors_event_t humidity, temp;
 float latitude, longitude;
@@ -87,6 +92,8 @@ uint32_t timer = millis();
 
 bool disp_button_state(uint32_t pin);
 uint8_t get_buttons_debounce(uint8_t last_buttons_state);
+void draw_menu(Adafruit_SH1107& oled);
+void update_menu(int32_t encoder_dir);
 
 // 'BackArrow', 5x7px
 const unsigned char epd_bitmap_BackArrow [] PROGMEM = {
@@ -99,6 +106,11 @@ const unsigned char* epd_bitmap_allArray[1] = {
 	epd_bitmap_BackArrow
 };
 
+
+const char *main_menu_entries[] = {"Lamp On/Off", "Set Alarm", "Adjust Color", "Weather", "Device Status", "Network Info", "GPS", "test entry", "test entry2", "test entry 3", "test entry 4"};
+#define MAIN_MENU_COUNT 11;
+bool light_on = false;
+bool cursor_indent = false;
 
 void setup() {
 
@@ -138,6 +150,14 @@ void setup() {
 
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
+
+  MenuEntry entries[11];
+  entries[0] = MenuEntry(main_menu_entries[0], &light_on, 0, 0);
+  for(int i = 1; i < 11; i++) {
+    entries[i] = MenuEntry(main_menu_entries[i]);
+  }
+  menu = Menu(true, entries, 11);
+
 }
 
 void loop() {
@@ -161,13 +181,15 @@ void loop() {
   }
   
   int32_t new_position = rot_encoder.getEncoderPosition();
+  bool encoder_button = false;
   encoder_dir = encoder_pos - new_position;
   encoder_pos = new_position;
   if(buttons_state & 1 << ENCOD_SWITCH_IDX) {
-    cursor_indent = !cursor_indent;
+    encoder_button = true; 
     encoder_dir = 0;
   }
 
+  /*
   if(!cursor_indent) {
     cursor_pos += encoder_dir;
     cursor_pos = constrain(cursor_pos, 0, 3);
@@ -175,35 +197,18 @@ void loop() {
     color_vals[cursor_pos] += 5 * encoder_dir;
     color_vals[cursor_pos] = constrain(color_vals[cursor_pos], 0, 255);
   }
+  */
 
   temp_sensor.getEvent(&humidity, &temp);
   //sev_seg.print(humidity.relative_humidity);
   //sev_seg.writeDisplay();
 
-  oled_display.clearDisplay();
-  oled_display.setCursor(0,0);
-  for(int i = 0; i < 4; i++) {
-    if(i == cursor_pos) {
-      if(!cursor_indent) {
-        oled_display.setTextColor(SH110X_BLACK, SH110X_WHITE);
-        oled_display.print(color_chars[i]); 
-        oled_display.print(": "); 
-        oled_display.println(color_vals[i]);
-        oled_display.setTextColor(SH110X_WHITE, SH110X_BLACK);
-      } else {
-        oled_display.print(color_chars[i]); 
-        oled_display.print(": "); 
-        oled_display.setTextColor(SH110X_BLACK, SH110X_WHITE);
-        oled_display.println(color_vals[i]);
-        oled_display.setTextColor(SH110X_WHITE, SH110X_BLACK);
-      }
-    } else {
-      oled_display.print(color_chars[i]); 
-      oled_display.print(": "); 
-      oled_display.println(color_vals[i]);
-    }
-  }
+  menu.UpdateMenu(encoder_dir, encoder_button);
+  menu.DrawMenu(oled_display);
+  oled_display.setCursor(100, 20);
+  oled_display.print(encoder_button);
 
+  /*
   if(buttons_state & 1 << DISP_SWITCHA_IDX) oled_display.print("A");
   if(buttons_state & 1 << DISP_SWITCHB_IDX) oled_display.print("B");
   if(buttons_state & 1 << DISP_SWITCHC_IDX) oled_display.print("C");
@@ -215,8 +220,6 @@ void loop() {
     oled_display.print("Not connected.\n Error code: "); oled_display.println(wifi_status);
   }
   oled_display.drawBitmap(50, 0, epd_bitmap_BackArrow, 5, 7, SH110X_WHITE);
-  oled_display.display();
-  /*
   oled_display.print("Temperature: ");
   oled_display.println(temp.temperature);
   oled_display.print("Lat: "); oled_display.print(latitude); oled_display.println(lat);
@@ -234,7 +237,12 @@ void loop() {
     pinMode(BUTTON_A, OUTPUT);
   }
   */
-  uint32_t pixel_color = neopixels.Color(color_vals[0], color_vals[1], color_vals[2], color_vals[3]);
+  oled_display.display();
+
+  uint32_t pixel_color = 0;
+  if(light_on) {
+    pixel_color = neopixels.Color(color_vals[0], color_vals[1], color_vals[2], color_vals[3]);
+  }
   neopixels.fill(pixel_color);
   neopixels.show();
 
@@ -270,6 +278,7 @@ uint8_t get_buttons_debounce(uint8_t last_buttons_state) {
   }
   return buttons_state;
 }
+
 
 // send an NTP request to the time server at the given address
 unsigned long sendNTPpacket(IPAddress& address)
