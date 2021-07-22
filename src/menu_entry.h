@@ -2,6 +2,7 @@
 #define MENU_ENTRY
 #include <Arduino.h>
 #include <Adafruit_SH110X.h> // OLED screen
+#include "bitmap.h"
 
 #define OLED_TEXTCOLS 21
 
@@ -37,10 +38,10 @@ class MenuEntry {
     MenuEntry(const char *text, int *value_ptr, int min, int max);
     MenuEntry(const char *text, bool *value_ptr, int min, int max);
     //MenuEntry(const char *text, char *value, uint32_ size);
-    MenuEntry(const char *text, Menu& submenu);
+    MenuEntry(const char *text, Menu *submenu);
     void DrawEntry(Adafruit_SH1107& oled, bool selected);
     int getTag();
-    Menu* getSubMenu();
+    Menu* getSubMenu(Menu* prevMenu);
     bool hasFocus();
     void update(int32_t encoder_dir, bool encoder_button);
 };

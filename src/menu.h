@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Adafruit_SH110X.h> // OLED screen
 #include "menu_entry.h"
+#include "bitmap.h"
 
 #define OLED_TEXTCOLS 21
 #define OLED_TEXTROWS 8
@@ -22,6 +23,7 @@ class Menu {
     void AddEntry(MenuEntry entry);
     void DrawMenu(Adafruit_SH1107& oled); 
     Menu* UpdateMenu(int32_t encoder_dir, bool encoder_button);
+    void setPreviousMenu(Menu *prev);
 };
 
 #endif

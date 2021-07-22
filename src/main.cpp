@@ -69,13 +69,16 @@ Adafruit_seesaw rot_encoder;
 Adafruit_VS1053_FilePlayer musicPlayer = 
   Adafruit_VS1053_FilePlayer(VS1053_RESET, VS1053_CS, VS1053_DCS, VS1053_DREQ, CARDCS);
 
-Menu menu = Menu(true);
+Menu main_menu = Menu(true);
+Menu lamp_color_menu = Menu(true);
+Menu *active_menu;
 
 bool GPS_status, temp_sensor_status, oled_status, sev_seg_status, neopixel_status, rot_encoder_status, music_player_status;
 int32_t encoder_pos, encoder_dir;
 uint8_t buttons_state = 0;
-int16_t color_vals [4] = {255, 243, 0, 0};
+int color_vals [4] = {255, 243, 0, 0};
 char color_chars [4] = {'r', 'g', 'b', 'w'};
+const char *color_strs[] = {"r", "g", "b", "w"};
 sensors_event_t humidity, temp;
 float latitude, longitude;
 char lat, lon;
@@ -95,19 +98,9 @@ uint8_t get_buttons_debounce(uint8_t last_buttons_state);
 void draw_menu(Adafruit_SH1107& oled);
 void update_menu(int32_t encoder_dir);
 
-// 'BackArrow', 5x7px
-const unsigned char epd_bitmap_BackArrow [] PROGMEM = {
-	0x18, 0x08, 0x28, 0x68, 0xf8, 0x60, 0x20
-};
-
-// Array of all bitmaps for convenience. (Total bytes used to store images in PROGMEM = 32)
-const int epd_bitmap_allArray_LEN = 1;
-const unsigned char* epd_bitmap_allArray[1] = {
-	epd_bitmap_BackArrow
-};
 
 
-const char *main_menu_entries[] = {"Lamp On/Off", "Set Alarm", "Adjust Color", "Weather", "Device Status", "Network Info", "GPS", "test entry", "test entry2", "test entry 3", "test entry 4"};
+const char *main_menu_entries[] = {"Lamp On/Off", "Adjust Color", "Set Alarm", "Weather", "Device Status", "Network Info", "GPS", "test entry", "test entry2", "test entry 3", "test entry 4"};
 #define MAIN_MENU_COUNT 11;
 bool light_on = false;
 bool cursor_indent = false;
@@ -151,12 +144,20 @@ void setup() {
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
 
-  MenuEntry entries[11];
-  entries[0] = MenuEntry(main_menu_entries[0], &light_on, 0, 0);
-  for(int i = 1; i < 11; i++) {
-    entries[i] = MenuEntry(main_menu_entries[i]);
+  MenuEntry lamp_color_entries[4];
+  for(int i = 0; i < 4; i++) {
+    lamp_color_entries[i] = MenuEntry(color_strs[i], &color_vals[i], 0, 255);
   }
-  menu = Menu(true, entries, 11);
+  lamp_color_menu = Menu(false, lamp_color_entries, 4);
+
+  MenuEntry main_entries[11];
+  main_entries[0] = MenuEntry(main_menu_entries[0], &light_on, 0, 0);
+  main_entries[1] = MenuEntry(main_menu_entries[1], &lamp_color_menu);
+  for(int i = 2; i < 11; i++) {
+    main_entries[i] = MenuEntry(main_menu_entries[i]);
+  }
+  main_menu = Menu(true, main_entries, 11);
+  active_menu = &main_menu;
 
 }
 
@@ -203,10 +204,13 @@ void loop() {
   //sev_seg.print(humidity.relative_humidity);
   //sev_seg.writeDisplay();
 
-  menu.UpdateMenu(encoder_dir, encoder_button);
-  menu.DrawMenu(oled_display);
-  oled_display.setCursor(100, 20);
-  oled_display.print(encoder_button);
+  Menu *update = active_menu->UpdateMenu(encoder_dir, encoder_button);
+  if(update != nullptr) {
+    active_menu = update;
+  }
+  active_menu->DrawMenu(oled_display);
+  //oled_display.setCursor(100, 20);
+  //oled_display.print(encoder_button);
 
   /*
   if(buttons_state & 1 << DISP_SWITCHA_IDX) oled_display.print("A");
@@ -221,7 +225,12 @@ void loop() {
   }
   oled_display.drawBitmap(50, 0, epd_bitmap_BackArrow, 5, 7, SH110X_WHITE);
   oled_display.print("Temperature: ");
-  oled_display.println(temp.temperature);
+  oled_display.println(temp.temperature);      cursor_pos = constrain(cursor_pos, 0, current_menu_count - 1);
+      if(cursor_pos < top_menu_item) {
+        top_menu_item = cursor_pos;
+      } else if (cursor_pos >= (top_menu_item + OLED_TEXTROWS + 1)) {
+        top_menu_item = cursor_pos - OLED_TEXTROWS;
+      }
   oled_display.print("Lat: "); oled_display.print(latitude); oled_display.println(lat);
   oled_display.print("Lon: "); oled_display.print(longitude); oled_display.println(lon);
   oled_display.print("Encoder pos: "); oled_display.println(new_position);
