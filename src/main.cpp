@@ -97,6 +97,7 @@ bool disp_button_state(uint32_t pin);
 uint8_t get_buttons_debounce(uint8_t last_buttons_state);
 void draw_menu(Adafruit_SH1107& oled);
 void update_menu(int32_t encoder_dir);
+void drawClock(Adafruit_7segment& sev_seg, uint8_t hr, uint8_t min, uint8_t brightness, bool tfhr_format);
 
 
 
@@ -190,19 +191,12 @@ void loop() {
     encoder_dir = 0;
   }
 
-  /*
-  if(!cursor_indent) {
-    cursor_pos += encoder_dir;
-    cursor_pos = constrain(cursor_pos, 0, 3);
-  } else {
-    color_vals[cursor_pos] += 5 * encoder_dir;
-    color_vals[cursor_pos] = constrain(color_vals[cursor_pos], 0, 255);
-  }
-  */
-
   temp_sensor.getEvent(&humidity, &temp);
+
   //sev_seg.print(humidity.relative_humidity);
-  //sev_seg.writeDisplay();
+
+  drawClock(sev_seg, 19, 49, 7, false);
+  
 
   Menu *update = active_menu->UpdateMenu(encoder_dir, encoder_button);
   if(update != nullptr) {
@@ -310,4 +304,26 @@ unsigned long sendNTPpacket(IPAddress& address)
   Udp.beginPacket(address, 123); //NTP requests are to port 123
   Udp.write(packetBuffer, NTP_PACKET_SIZE);
   Udp.endPacket();
+}
+
+void drawClock(Adafruit_7segment& sev_seg, uint8_t hr, uint8_t min, uint8_t brightness, bool tfhr_format) {
+  if(tfhr_format) {
+    sev_seg.writeDigitNum(0, hr / 10);
+    sev_seg.writeDigitNum(1, hr % 10);
+    sev_seg.writeDigitNum(3, min / 10);
+    sev_seg.writeDigitNum(4, min % 10);
+  } else {
+    bool pm_dot = false;
+    if(hr > 12){
+      hr = hr-12;
+      pm_dot=true;
+    }
+    sev_seg.writeDigitNum(0, hr / 10);
+    sev_seg.writeDigitNum(1, hr % 10);
+    sev_seg.writeDigitNum(3, min / 10);
+    sev_seg.writeDigitNum(4, min % 10, pm_dot);
+  }
+  sev_seg.drawColon(true);
+  sev_seg.setBrightness(constrain(brightness, 0, 15));
+  sev_seg.writeDisplay();
 }
