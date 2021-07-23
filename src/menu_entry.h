@@ -22,7 +22,7 @@ typedef struct {
   union {
     struct {int *value_ptr;} int_disp;
     struct {bool *value_ptr;} bool_disp;
-    struct {int *value_ptr; int min; int max; bool focus;} int_edit;
+    struct {int *value_ptr; bool focus; int min; int max; } int_edit;
     Menu *submenu_ptr;
   };
 } Entry;

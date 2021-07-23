@@ -71,14 +71,20 @@ Adafruit_VS1053_FilePlayer musicPlayer =
 
 Menu main_menu = Menu(true);
 Menu lamp_color_menu = Menu(true);
+Menu test_menu = Menu(true);
+MenuEntry lamp_color_entries[4];
+MenuEntry test_entries[2];
+MenuEntry main_entries[11];
 Menu *active_menu;
 
 bool GPS_status, temp_sensor_status, oled_status, sev_seg_status, neopixel_status, rot_encoder_status, music_player_status;
 int32_t encoder_pos, encoder_dir;
 uint8_t buttons_state = 0;
+int test1, test2;
+int disp_brightness = 15;
 int color_vals [4] = {255, 243, 0, 0};
 char color_chars [4] = {'r', 'g', 'b', 'w'};
-const char *color_strs[] = {"r", "g", "b", "w"};
+const char *color_strs[] = {"red", "gre", "blu", "whi"};
 sensors_event_t humidity, temp;
 float latitude, longitude;
 char lat, lon;
@@ -98,8 +104,6 @@ uint8_t get_buttons_debounce(uint8_t last_buttons_state);
 void draw_menu(Adafruit_SH1107& oled);
 void update_menu(int32_t encoder_dir);
 void drawClock(Adafruit_7segment& sev_seg, uint8_t hr, uint8_t min, uint8_t brightness, bool tfhr_format);
-
-
 
 const char *main_menu_entries[] = {"Lamp On/Off", "Adjust Color", "Set Alarm", "Weather", "Device Status", "Network Info", "GPS", "test entry", "test entry2", "test entry 3", "test entry 4"};
 #define MAIN_MENU_COUNT 11;
@@ -145,28 +149,31 @@ void setup() {
   pinMode(BUTTON_B, INPUT_PULLUP);
   pinMode(BUTTON_C, INPUT_PULLUP);
 
-  MenuEntry lamp_color_entries[4];
   for(int i = 0; i < 4; i++) {
     lamp_color_entries[i] = MenuEntry(color_strs[i], &color_vals[i], 0, 255);
   }
+  lamp_color_entries[0] = MenuEntry("red", &color_vals[0], 0, 255);
   lamp_color_menu = Menu(false, lamp_color_entries, 4);
 
-  MenuEntry main_entries[11];
-  main_entries[0] = MenuEntry(main_menu_entries[0], &light_on, 0, 0);
-  main_entries[1] = MenuEntry(main_menu_entries[1], &lamp_color_menu);
-  for(int i = 2; i < 11; i++) {
+  test_entries[0] = MenuEntry("Test val1", &disp_brightness, 0, 15);
+  test_entries[1] = MenuEntry("Test val2", &test1, 0, 22);
+  test_menu = Menu(false, test_entries, 2);
+
+  for(int i = 0; i < 11; i++) {
     main_entries[i] = MenuEntry(main_menu_entries[i]);
   }
+  main_entries[0] = MenuEntry(main_menu_entries[0], &light_on, 0, 0);
+  main_entries[1] = MenuEntry(main_menu_entries[1], &lamp_color_menu);
+  main_entries[2] = MenuEntry(main_menu_entries[2], &test_menu);
   main_menu = Menu(true, main_entries, 11);
   active_menu = &main_menu;
-
 }
 
 void loop() {
 
   buttons_state = get_buttons_debounce(buttons_state);
 
-  char c = GPS.read();
+  GPS.read();
   // if a sentence is received, we can check the checksum, parse it...
   if (GPS.newNMEAreceived()) {
     if (GPS.parse(GPS.lastNMEA())) { // this also sets the newNMEAreceived() flag to false
@@ -186,6 +193,8 @@ void loop() {
   bool encoder_button = false;
   encoder_dir = encoder_pos - new_position;
   encoder_pos = new_position;
+  test1 = encoder_pos;
+  test2 = encoder_dir;
   if(buttons_state & 1 << ENCOD_SWITCH_IDX) {
     encoder_button = true; 
     encoder_dir = 0;
@@ -195,7 +204,7 @@ void loop() {
 
   //sev_seg.print(humidity.relative_humidity);
 
-  drawClock(sev_seg, 19, 49, 7, false);
+  drawClock(sev_seg, 19, 49, disp_brightness, false);
   
 
   Menu *update = active_menu->UpdateMenu(encoder_dir, encoder_button);
@@ -203,8 +212,8 @@ void loop() {
     active_menu = update;
   }
   active_menu->DrawMenu(oled_display);
-  //oled_display.setCursor(100, 20);
-  //oled_display.print(encoder_button);
+  oled_display.setCursor(100, 30);
+  oled_display.print(disp_brightness);
 
   /*
   if(buttons_state & 1 << DISP_SWITCHA_IDX) oled_display.print("A");
@@ -304,6 +313,7 @@ unsigned long sendNTPpacket(IPAddress& address)
   Udp.beginPacket(address, 123); //NTP requests are to port 123
   Udp.write(packetBuffer, NTP_PACKET_SIZE);
   Udp.endPacket();
+  return 0;
 }
 
 void drawClock(Adafruit_7segment& sev_seg, uint8_t hr, uint8_t min, uint8_t brightness, bool tfhr_format) {

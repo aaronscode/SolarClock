@@ -12,23 +12,23 @@ MenuEntry::MenuEntry(const char *text) {
 
 MenuEntry::MenuEntry(const char *text, int *value_ptr) {
   entry.tag = INT_DISP;
-  entry.int_disp.value_ptr = value_ptr;
   strcpy(entry.text, text);
+  entry.int_disp.value_ptr = value_ptr;
 }
 
 MenuEntry::MenuEntry(const char *text, bool *value_ptr) {
   entry.tag = BOOL_DISP;
-  entry.bool_disp.value_ptr = value_ptr;
   strcpy(entry.text, text);
+  entry.bool_disp.value_ptr = value_ptr;
 }
 
 MenuEntry::MenuEntry(const char *text, int *value_ptr, int min, int max) {
   entry.tag = INT_EDIT;
+  strcpy(entry.text, text);
   entry.int_edit.value_ptr = value_ptr;
+  entry.int_edit.focus = false;
   entry.int_edit.min = min;
   entry.int_edit.max = max;
-  entry.int_edit.focus = false;
-  strcpy(entry.text, text);
 }
 MenuEntry::MenuEntry(const char *text, bool *value_ptr, int min, int max) {
   entry.tag = BOOL_EDIT;
@@ -69,11 +69,11 @@ void MenuEntry::DrawEntry(Adafruit_SH1107& oled, bool selected){
         if(entry.int_edit.focus) {
           oled.print(entry.text); oled.print(": "); 
           oled.setTextColor(SH110X_BLACK, SH110X_WHITE);
-          oled.print(*entry.int_disp.value_ptr);
+          oled.print(*(entry.int_disp.value_ptr));
           oled.setTextColor(SH110X_WHITE, SH110X_BLACK);
         } else {
           oled.setTextColor(SH110X_BLACK, SH110X_WHITE);
-          oled.print(entry.text); oled.print(": "); oled.print(*entry.int_disp.value_ptr);
+          oled.print(entry.text); oled.print(": "); oled.print(*(entry.int_disp.value_ptr));
           oled.setTextColor(SH110X_WHITE, SH110X_BLACK);
         }
       }

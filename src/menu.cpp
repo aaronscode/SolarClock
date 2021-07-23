@@ -7,14 +7,16 @@ Menu::Menu(bool top_level) : cursor_pos(0), top_menu_item(0), top_level(top_leve
 
 Menu::Menu(bool top_level, MenuEntry *entries, uint16_t count) : cursor_pos(0), top_menu_item(0), top_level(top_level) {
   current_menu_count = count;
+  //menu_entries = (MenuEntry*) malloc(sizeof(MenuEntry) * current_menu_count);
   for(int i = 0; i < current_menu_count; i++) {
     menu_entries[i] = entries[i];
   }
 }
 
+Menu::~Menu() {
+}
+
 void Menu::AddEntry(MenuEntry entry) {
-  menu_entries[current_menu_count] = entry;
-  current_menu_count++;
 }
 
 void Menu::DrawMenu(Adafruit_SH1107& oled) {
@@ -42,6 +44,8 @@ void Menu::DrawMenu(Adafruit_SH1107& oled) {
   oled.print(cursor_pos);
   oled.setCursor(100, 10);
   oled.print(top_menu_item);
+  oled.setCursor(100, 20);
+  oled.print(menu_entries[cursor_pos].getTag());
 }
 
 Menu* Menu::UpdateMenu(int32_t encoder_dir, bool encoder_button) {
