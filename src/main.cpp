@@ -212,8 +212,8 @@ void loop() {
     active_menu = update;
   }
   active_menu->DrawMenu(oled_display);
-  oled_display.setCursor(100, 30);
-  oled_display.print(disp_brightness);
+  //oled_display.setCursor(100, 30);
+  //oled_display.print(disp_brightness);
 
   /*
   if(buttons_state & 1 << DISP_SWITCHA_IDX) oled_display.print("A");
@@ -229,6 +229,7 @@ void loop() {
   oled_display.drawBitmap(50, 0, epd_bitmap_BackArrow, 5, 7, SH110X_WHITE);
   oled_display.print("Temperature: ");
   oled_display.println(temp.temperature);      cursor_pos = constrain(cursor_pos, 0, current_menu_count - 1);
+  
       if(cursor_pos < top_menu_item) {
         top_menu_item = cursor_pos;
       } else if (cursor_pos >= (top_menu_item + OLED_TEXTROWS + 1)) {

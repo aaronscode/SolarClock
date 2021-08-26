@@ -40,12 +40,14 @@ void Menu::DrawMenu(Adafruit_SH1107& oled) {
 
 
   }
+  /*
   oled.setCursor(100, 0);
   oled.print(cursor_pos);
   oled.setCursor(100, 10);
   oled.print(top_menu_item);
   oled.setCursor(100, 20);
   oled.print(menu_entries[cursor_pos].getTag());
+  */
 }
 
 Menu* Menu::UpdateMenu(int32_t encoder_dir, bool encoder_button) {

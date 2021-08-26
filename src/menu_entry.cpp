@@ -65,22 +65,44 @@ void MenuEntry::DrawEntry(Adafruit_SH1107& oled, bool selected){
       }
       break;
     case INT_EDIT:
-      if(selected) {
-        if(entry.int_edit.focus) {
-          oled.print(entry.text); oled.print(": "); 
-          oled.setTextColor(SH110X_BLACK, SH110X_WHITE);
-          oled.print(*(entry.int_disp.value_ptr));
-          oled.setTextColor(SH110X_WHITE, SH110X_BLACK);
-        } else {
-          oled.setTextColor(SH110X_BLACK, SH110X_WHITE);
-          oled.print(entry.text); oled.print(": "); oled.print(*(entry.int_disp.value_ptr));
-          oled.setTextColor(SH110X_WHITE, SH110X_BLACK);
+      {
+        int disp_value = *(entry.int_edit.value_ptr);
+        int disp_min = entry.int_edit.min;
+        int disp_max = entry.int_edit.max;
+        float percent_full = float(disp_value - disp_min) / float(disp_max-disp_min);
+        if(selected) {
+          if(entry.int_edit.focus) {
+            oled.print(entry.text); oled.print(":"); 
+            int x = oled.getCursorX();
+            int y = oled.getCursorY();
+            oled.fillRect(x, y, (127-x), 8, SH110X_WHITE);
+            oled.drawRect(x+1, y+1, 127-x-2, 6, SH110X_BLACK);
+            oled.fillRect(x+2, y+2, (127-x-3)*percent_full, 4, SH110X_BLACK);
+          } else {
+            oled.setTextColor(SH110X_BLACK, SH110X_WHITE);
+            oled.print(entry.text); oled.print(":"); 
+            oled.setTextColor(SH110X_WHITE, SH110X_BLACK);
+            //oled.print(*(entry.int_disp.value_ptr));
+            int x = oled.getCursorX();
+            int y = oled.getCursorY();
+            oled.fillRect(x, y, (127-x), 8, SH110X_WHITE);
+            oled.drawRect(x+1, y+1, 127-x-2, 6, SH110X_BLACK);
+            oled.fillRect(x+2, y+2, (127-x-3)*percent_full, 4, SH110X_BLACK);
+
+          }
         }
+        else {
+          oled.print(entry.text); oled.print(":"); 
+          int x = oled.getCursorX();
+          int y = oled.getCursorY();
+          
+          oled.drawRect(x, y+1, 127-x, 6, SH110X_WHITE);
+          oled.fillRect(x+1, y+2, (127-x-2)*percent_full, 4, SH110X_WHITE);
+
+          //oled.print(*entry.int_disp.value_ptr);
+        }
+        break;
       }
-      else {
-        oled.print(entry.text); oled.print(": "); oled.print(*entry.int_disp.value_ptr);
-      }
-      break;
     case BOOL_DISP:
     case BOOL_EDIT:
       if(selected) {
